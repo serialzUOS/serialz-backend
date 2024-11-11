@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/serialz.iml" filepath="$PROJECT_DIR$/.idea/serialz.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/serialz-backend.iml" filepath="$PROJECT_DIR$/.idea/serialz-backend.iml" />
     </modules>
   </component>
 </project>
