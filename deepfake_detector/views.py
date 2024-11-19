@@ -7,20 +7,11 @@ from asgiref.sync import async_to_sync, sync_to_async
 from deepfake_detector.ai.inference import preprocess_image, detect_and_crop_face, process_with_npu, \
     process_video
 
-
-import logging
-# NPU 상태 관리
 npu_state = {"current": "npu0"}
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-
-@sync_to_async
 @csrf_exempt
 @async_to_sync
 async def image_inference(request):
-    """
-    단일 이미지 추론 API
-    """
     if request.method == "POST" and request.FILES.get("image"):
         try:
             # 이미지 읽기
@@ -50,13 +41,9 @@ async def image_inference(request):
     return JsonResponse({"error": "Invalid request"}, status=400)
 
 
-@sync_to_async
 @csrf_exempt
 @async_to_sync
 async def video_inference(request):
-    """
-    비디오 파일 추론 API
-    """
     if request.method == "POST" and request.FILES.get("video"):
         try:
             # 비디오 읽기 및 임시 파일 경로 생성
