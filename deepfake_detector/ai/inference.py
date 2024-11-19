@@ -3,9 +3,6 @@ import torchvision.transforms as transforms
 from furiosa.runtime import session, create_queue
 from asyncio import Lock
 
-# NPU 상태 관리
-npu_locks = {"npu0": Lock(), "npu1": Lock()}
-
 # 이미지 전처리 함수
 async def preprocess_image(image):
     """
@@ -30,42 +27,55 @@ async def preprocess_image(image):
     tensor = transform(image).unsqueeze(0)  # 배치 차원 추가
     return tensor.numpy().astype(np.float32)
 
-# 추론 처리 함수
-async def process_image(image, npu_state):
-    """
-    이미지에 대한 추론을 수행합니다.
-
-    Args:
-        image (PIL.Image): 입력 이미지
-        npu_state (dict): NPU 상태 관리 변수
-
-    Returns:
-        dict: 추론 결과
-    """
-    # 현재 사용 중인 NPU와 Lock 가져오기
-    current_npu = npu_state["current"]
-    lock = npu_locks[current_npu]
-
-    # NPU 동기화 및 상태 전환
-    async with lock:
-        npu_state["current"] = "npu1" if current_npu == "npu0" else "npu0"
-
-        # 이미지 전처리
-        input_tensor = await preprocess_image(image)
-        print("이미지 전처리 완료")
-        # NPU에서 추론 실행
-        result = await run_inference(input_tensor, current_npu)
-
-        # 결과 반환
-        return {
-            "npu_used": current_npu,
-            **result,  # 추론 결과 포함
-        }
-
 
 # Softmax 계산 함수
 def softmax(logits):
     exp_logits = np.exp(logits) 
     return exp_logits / np.sum(exp_logits)
 
+async def detect_and_crop_face(image):
+    """
+    주어진 이미지에서 얼굴을 감지하고 크롭합니다.
+
+    Args:
+        image (PIL.Image): 입력 이미지
+
+    Returns:
+        PIL.Image or None: 감지된 얼굴 영역을 크롭한 이미지 또는 None
+    """
+    frame_rgb = np.array(image)
+    frame_rgb = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+    boxes, _ = face_detector.detect(image, landmarks=False)
+
+    if boxes is None:
+        logging.warning("No face detected.")
+        return None
+
+    xmin, ymin, xmax, ymax = map(int, boxes[0])
+    face_crop = frame_rgb[ymin:ymax, xmin:xmax]
+    return Image.fromarray(cv2.cvtColor(face_crop, cv2.COLOR_BGR2RGB))
+
+
+async def process_with_npu(input_tensor, current_npu):
+    """
+    NPU에서 데이터를 처리하고 결과를 반환합니다.
+
+    Args:
+        input_tensor (torch.Tensor): 전처리된 입력 데이터
+        current_npu (str): 사용할 NPU ("npu0" 또는 "npu1")
+
+    Returns:
+        dict: 추론 결과
+    """
+    submitter, receiver = queues[current_npu]
+
+    # 데이터 제출 및 결과 수신
+    await submitter.submit(input_tensor)
+    async for _, outputs in receiver:
+        probabilities = softmax(outputs[1][0])
+        return {
+            "npu_used": current_npu,
+            "deepfake_probability": float(probabilities[1]),
+            "normal_probability": float(probabilities[0]),
+        }
 

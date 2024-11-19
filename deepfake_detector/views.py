@@ -11,7 +11,7 @@ import cv2
 from asgiref.sync import async_to_sync, sync_to_async
 import torch
 import asyncio
-from deepfake_detector.ai.inference import preprocess_image, softmax
+from deepfake_detector.ai.inference import preprocess_image, softmax, detect_and_crop_face
 from deepfake_detector.ai.startup import queues
 from tqdm.asyncio import tqdm
 import logging
@@ -39,29 +39,29 @@ async def image_inference(request):
             # 이미지 읽기
             image_file = request.FILES["image"]
             image = Image.open(BytesIO(image_file.read())).convert("RGB")
+            
+            # 얼굴 감지 및 크롭
+            cropped_face = await detect_and_crop_face(image)
+            if cropped_face is None:
+                return JsonResponse({"error": "No face detected in the image."}, status=400)
+
             # 이미지 전처리
-            input_tensor = await preprocess_image(image)
-            # NPU 교대 처리
+            input_tensor = await preprocess_image(cropped_face)
+
+            # NPU 상태 관리
             current_npu = npu_state["current"]
             npu_state["current"] = "npu1" if current_npu == "npu0" else "npu0"
-            
-            # 전역 큐에서 NPU 사용
-            submitter, receiver = queues[current_npu]
 
-            # 입력 데이터 제출 및 결과 수신
-            await submitter.submit(input_tensor)
-            async for _, outputs in receiver:
-                probabilities = softmax(outputs[1][0])
-                return JsonResponse({
-                    "npu_used": current_npu,
-                    "deepfake_probability": float(probabilities[1]),
-                    "normal_probability": float(probabilities[0]),
-                })
+            # NPU 추론
+            result = await process_with_npu(input_tensor, current_npu)
+
+            return JsonResponse(result)
 
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
 
     return JsonResponse({"error": "Invalid request"}, status=400)
+
 
 @sync_to_async
 @csrf_exempt
@@ -122,31 +122,25 @@ async def process_video(video_path):
                 logging.warning(f"Frame {idx} could not be read or is None.")
                 continue
 
-            # 얼굴 감지
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame_image = Image.fromarray(frame_rgb)
-            boxes, probs = face_detector.detect(frame_image, landmarks=False)
-            if boxes is None:
+            # 얼굴 감지 및 크롭
+            frame_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            cropped_face = await detect_and_crop_face(frame_image)
+            if cropped_face is None:
                 logging.warning(f"No face detected in frame {idx}.")
                 continue
 
-            # 크롭 및 추론
-            xmin, ymin, xmax, ymax = map(int, boxes[0])
-            face_crop = frame_rgb[ymin:ymax, xmin:xmax]
-            input_tensor = await preprocess_image(Image.fromarray(face_crop))
+            # 이미지 전처리
+            input_tensor = await preprocess_image(cropped_face)
 
-            # NPU 처리
+            # NPU 상태 관리
             current_npu = npu_state["current"]
             npu_state["current"] = "npu1" if current_npu == "npu0" else "npu0"
-            submitter, receiver = queues[current_npu]
 
-            # NPU에 데이터 제출 및 결과 수신
-            await submitter.submit(input_tensor)
-            async for task_id, outputs in receiver:
-                probabilities = softmax(outputs[1][0])
-                writer.writerow([idx / fps, float(probabilities[1])])
-                logging.info(f"Frame {idx} processed successfully.")
-                break  # 수신이 완료되면 루프를 종료합니다.
+            # NPU 추론
+            result = await process_with_npu(input_tensor, current_npu)
+
+            writer.writerow([idx / fps, result["deepfake_probability"]])
+            logging.info(f"Frame {idx} processed successfully.")
 
     logging.info("Video processing completed.")
     return csv_path
