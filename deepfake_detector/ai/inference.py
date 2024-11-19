@@ -1,7 +1,7 @@
 import numpy as np
 import torchvision.transforms as transforms
-from furiosa.runtime import session, create_queue
-from asyncio import Lock
+from deepfake_detector.ai.startup import queues
+import cv2
 
 # 이미지 전처리 함수
 async def preprocess_image(image):

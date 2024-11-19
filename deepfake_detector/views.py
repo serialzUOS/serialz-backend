@@ -1,8 +1,6 @@
 from django.views.decorators.csrf import csrf_exempt
 from PIL import Image
 from io import BytesIO
-import numpy as np
-import os
 import csv
 from django.http import JsonResponse, FileResponse
 from facenet_pytorch.models.mtcnn import MTCNN
@@ -10,10 +8,9 @@ import tempfile
 import cv2
 from asgiref.sync import async_to_sync, sync_to_async
 import torch
-import asyncio
-from deepfake_detector.ai.inference import preprocess_image, softmax, detect_and_crop_face
-from deepfake_detector.ai.startup import queues
-from tqdm.asyncio import tqdm
+from deepfake_detector.ai.inference import preprocess_image, detect_and_crop_face, process_with_npu
+
+
 import logging
 # NPU 상태 관리
 npu_state = {"current": "npu0"}
