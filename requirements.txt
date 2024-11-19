@@ -9,7 +9,7 @@ asgiref==3.8.1
 async-timeout==4.0.3
 attrs==24.2.0
 beautifulsoup4==4.12.3
-Brotli @ file:///croot/brotli-split_1714483155106/work
+Brotli
 certifi @ file:///croot/certifi_1725551672989/work/certifi
 cffi==1.17.1
 channels==4.2.0
