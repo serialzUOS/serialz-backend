@@ -3,9 +3,6 @@ import torchvision.transforms as transforms
 from furiosa.runtime import session, create_queue
 from asyncio import Lock
 
-# 모델 경로 설정
-MODEL_PATH = "/home/ubuntu/serialz/serialz-backend/deepfake_detector/ai/optimized_model/ENTROPY_SYM_1.dfg"
-
 # NPU 상태 관리
 npu_locks = {"npu0": Lock(), "npu1": Lock()}
 
@@ -65,35 +62,10 @@ async def process_image(image, npu_state):
             **result,  # 추론 결과 포함
         }
 
-async def run_inference(input_tensor, npu):
-    """
-    특정 NPU에서 이미지를 추론합니다.
-
-    Args:
-        input_tensor (numpy.ndarray): 전처리된 이미지
-        npu (str): NPU ID ("npu0" 또는 "npu1")
-
-    Returns:
-        dict: 추론 결과
-    """
-    try:
-        async with create_queue(MODEL_PATH, worker_num=1, device=npu) as (submitter, receiver):
-            # 입력 데이터 제출
-            await submitter.submit(input_tensor)
-
-            # 결과 수신
-            async for _, outputs in receiver:
-                probabilities = softmax(outputs[1][0])
-                return {
-                    "deepfake_probability": float(probabilities[1]),
-                    "normal_probability": float(probabilities[0]),
-                }
-    except Exception as e:
-        print(f"Error during inference on {npu}: {e}")  # 디버깅 로그
-        raise
-
 
 # Softmax 계산 함수
 def softmax(logits):
     exp_logits = np.exp(logits) 
     return exp_logits / np.sum(exp_logits)
+
+
