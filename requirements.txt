@@ -12,6 +12,7 @@ beautifulsoup4==4.12.3
 Brotli @ file:///croot/brotli-split_1714483155106/work
 certifi @ file:///croot/certifi_1725551672989/work/certifi
 cffi==1.17.1
+channels==4.2.0
 charset-normalizer @ file:///croot/charset-normalizer_1721748349566/work
 click==8.1.7
 coloredlogs==15.0.1
