@@ -1,11 +1,12 @@
 from django.views.decorators.csrf import csrf_exempt
 from PIL import Image
 from io import BytesIO
-from django.http import JsonResponse, FileResponse
+from django.http import JsonResponse, StreamingHttpResponse
 import tempfile
 from asgiref.sync import async_to_sync, sync_to_async
 from deepfake_detector.ai.inference import preprocess_image, detect_and_crop_face, process_with_npu, \
     process_video
+import aiofiles
 
 npu_state = {"current": "npu0"}
 
@@ -57,12 +58,18 @@ async def video_inference(request):
             # 비디오 처리 및 추론
             await process_video(temp_video_path, result_csv_path, npu_state)
 
-            # CSV 파일 응답
-            response = FileResponse(
-                open(result_csv_path, "rb"),
-                as_attachment=True,
-                filename="inference_results.csv",
+            # 비동기 파일 스트리밍
+            async def file_iterator(file_path):
+                async with aiofiles.open(file_path, mode="rb") as f:
+                    while chunk := await f.read(8192):
+                        yield chunk
+
+            # 비동기 스트리밍 HTTP 응답
+            response = StreamingHttpResponse(
+                file_iterator(result_csv_path),
+                content_type="text/csv"
             )
+            response["Content-Disposition"] = "attachment; filename=inference_results.csv"
             return response
 
         except Exception as e:
