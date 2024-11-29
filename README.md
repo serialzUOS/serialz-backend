@@ -4,4 +4,4 @@
 conda activate furiosa-3.9
 
 # 웹서버 실행 명령어
-uvicorn config.asgi:application --host 0.0.0.0 --port 8000
+uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload --log-level debug
