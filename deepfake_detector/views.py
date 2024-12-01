@@ -5,7 +5,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse, StreamingHttpResponse, HttpResponse
 from PIL import Image
 from io import BytesIO
-from deepfake_detector.ai.inference import detect_and_crop_face, preprocess_image, process_with_npu, process_video_and_generate_csv
+from deepfake_detector.ai.inference import detect_and_crop_face, preprocess_image, process_with_npu, process_video, process_with_npu_fusionPE
 import aiofiles
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -34,12 +34,13 @@ async def image_inference(request):
             # 이미지 전처리
             input_tensor = await preprocess_image(cropped_face)
 
-            # NPU 상태 관리
-            current_npu = npu_state["current"]
-            npu_state["current"] = "npu1" if current_npu == "npu0" else "npu0"
+            # # NPU 상태 관리
+            # current_npu = npu_state["current"]
+            # npu_state["current"] = "npu1" if current_npu == "npu0" else "npu0"
 
-            # NPU 추론
-            result = await process_with_npu(input_tensor, current_npu)
+            # # NPU 추론
+            # result = await process_with_npu(input_tensor, current_npu)
+            result = await process_with_npu_fusionPE(input_tensor)
             return JsonResponse(result)
 
         except Exception as e:
@@ -64,7 +65,7 @@ async def video_inference(request):
                 f.write(video_file.read())
 
             # 비디오 처리 및 추론
-            await process_video_and_generate_csv(temp_video_path, result_csv_path, npu_state)
+            await process_video(temp_video_path, result_csv_path, npu_state)
 
             # 결과 CSV를 스트리밍으로 반환
             async def file_iterator(file_path):

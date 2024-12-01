@@ -45,9 +45,17 @@ ALLOWED_HOSTS = [
   '127.0.0.1',
   'serialz.site',
   'www.serialz.site',
+  'https://serialz-web.vercel.app',  # 배포된 웹 도메인
 ]
 
-
+CORS_ALLOWED_ORIGINS = [
+    "https://serialz-web.vercel.app",
+    # 기타 허용할 도메인
+]
+CORS_ALLOWED_METHODS = [
+    'POST',
+    'GET',
+]
 
 # Application definition
 
